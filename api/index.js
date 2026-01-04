@@ -1,17 +1,30 @@
-// ===================================================
-// EKKO SIMPLE BACKEND (NO ENCRYPTION, ALLOW ALL ORIGINS)
-// ===================================================
+// =====================================================
+// EKKO SIMPLE BACKEND (NO ENCRYPTION, CORS ALLOWED)
+// =====================================================
 
 const GH_API = "https://api.github.com";
 
-// ---------- Parse JSON body ----------
+// ---------------- SAFE BODY PARSER ----------------
 async function parseBody(req) {
+  // GET / DELETE never have body
+  if (req.method === "GET" || req.method === "DELETE") {
+    return {};
+  }
+
+  const length = Number(req.headers["content-length"] || 0);
+  if (length === 0) return {};
+
   return new Promise(resolve => {
     let data = "";
-    req.on("data", c => (data += c));
+
+    req.on("data", chunk => {
+      data += chunk;
+    });
+
     req.on("end", () => {
+      if (!data) return resolve({});
       try {
-        resolve(JSON.parse(data || "{}"));
+        resolve(JSON.parse(data));
       } catch {
         resolve({});
       }
@@ -19,7 +32,7 @@ async function parseBody(req) {
   });
 }
 
-// ---------- GitHub API helper ----------
+// ---------------- GitHub Request ----------------
 async function ghRequest(url, method = "GET", body) {
   const res = await fetch(url, {
     method,
@@ -38,7 +51,7 @@ async function ghRequest(url, method = "GET", body) {
   return res.json();
 }
 
-// ---------- Load DB ----------
+// ---------------- Load DB ----------------
 async function loadDB() {
   const url =
     `${GH_API}/repos/${process.env.GITHUB_USERNAME}` +
@@ -46,7 +59,6 @@ async function loadDB() {
     `/contents/data/db.json?ref=${process.env.GITHUB_BRANCH || "main"}`;
 
   const file = await ghRequest(url);
-
   const db = JSON.parse(
     Buffer.from(file.content, "base64").toString("utf8")
   );
@@ -54,7 +66,7 @@ async function loadDB() {
   return { db, sha: file.sha };
 }
 
-// ---------- Save DB ----------
+// ---------------- Save DB ----------------
 async function saveDB(db, sha, message) {
   const url =
     `${GH_API}/repos/${process.env.GITHUB_USERNAME}` +
@@ -69,19 +81,16 @@ async function saveDB(db, sha, message) {
   });
 }
 
-// ===================================================
+// =====================================================
 // MAIN HANDLER
-// ===================================================
+// =====================================================
 export default async function handler(req, res) {
   try {
-    // ---------- CORS: ALLOW ALL ----------
+    // ---------- CORS (ALLOW ALL ORIGINS) ----------
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-    if (req.method === "OPTIONS") {
-      return res.status(204).end();
-    }
+    if (req.method === "OPTIONS") return res.status(204).end();
 
     const { action } = req.query;
 
@@ -89,7 +98,7 @@ export default async function handler(req, res) {
     if (!action || action === "ping") {
       return res.json({
         ok: true,
-        status: "EKKO SIMPLE LIVE",
+        status: "EKKO LIVE",
         time: Date.now()
       });
     }
@@ -148,7 +157,6 @@ export default async function handler(req, res) {
       }
 
       db.likes[key] = true;
-
       if (db.contents[body.contentId]) {
         db.contents[body.contentId].likes++;
       }
@@ -162,14 +170,13 @@ export default async function handler(req, res) {
       const list = Object.values(db.contents).sort(
         (a, b) => b.likes - a.likes || b.createdAt - a.createdAt
       );
-
       return res.json({ ok: true, data: list });
     }
 
     return res.json({ ok: false, message: "Unknown action" });
 
   } catch (err) {
-    // IMPORTANT: show error for debugging
+    // SHOW ERROR FOR DEBUG
     return res.status(500).json({
       ok: false,
       error: err.message
