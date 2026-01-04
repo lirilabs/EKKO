@@ -1,5 +1,6 @@
 export function trending(contents) {
   const now = Date.now();
+
   return Object.values(contents)
     .map(c => {
       const ageH = (now - c.createdAt) / 3_600_000;
