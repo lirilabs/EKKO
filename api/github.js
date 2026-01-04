@@ -18,6 +18,7 @@ export async function ghRequest(gh, url, method = "GET", body) {
     },
     body: body ? JSON.stringify(body) : undefined
   });
+
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
