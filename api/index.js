@@ -1,6 +1,7 @@
 import { readStore, writeStore } from "./storage.js";
 import { getTrending } from "./trending.js";
 import crypto from "crypto";
+import "dotenv/config";
 
 const uid = () => crypto.randomUUID();
 
