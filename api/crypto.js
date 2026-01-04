@@ -6,26 +6,22 @@ if (KEY.length !== 32) {
   throw new Error("Invalid DATA_ENCRYPTION_KEY length");
 }
 
-// Generate a UNIQUE IV per encryption (REQUIRED for GCM)
-function generateIV() {
-  return crypto.randomBytes(12); // 96-bit IV (GCM standard)
-}
-
-export function encrypt(data) {
-  const iv = generateIV();
+// AES-GCM requires UNIQUE IV per encryption
+export function encryptJSON(obj) {
+  const iv = crypto.randomBytes(12); // 96-bit standard
   const cipher = crypto.createCipheriv("aes-256-gcm", KEY, iv);
 
-  let encrypted = cipher.update(JSON.stringify(data), "utf8", "hex");
-  encrypted += cipher.final("hex");
+  let encrypted = cipher.update(JSON.stringify(obj), "utf8", "base64");
+  encrypted += cipher.final("base64");
 
   return {
     iv: iv.toString("hex"),
-    content: encrypted,
+    data: encrypted,
     tag: cipher.getAuthTag().toString("hex")
   };
 }
 
-export function decrypt(payload) {
+export function decryptJSON(payload) {
   const decipher = crypto.createDecipheriv(
     "aes-256-gcm",
     KEY,
@@ -34,7 +30,7 @@ export function decrypt(payload) {
 
   decipher.setAuthTag(Buffer.from(payload.tag, "hex"));
 
-  let decrypted = decipher.update(payload.content, "hex", "utf8");
+  let decrypted = decipher.update(payload.data, "base64", "utf8");
   decrypted += decipher.final("utf8");
 
   return JSON.parse(decrypted);
