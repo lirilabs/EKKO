@@ -1,0 +1,22 @@
+{
+  "name": "audio-moment-api",
+  "version": "1.0.0",
+  "description": "Serverless API for audio moments with encrypted storage and trending logic",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "node api/index.js",
+    "lint": "npx eslint .",
+    "format": "npx prettier --write ."
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.5"
+  }
+}
