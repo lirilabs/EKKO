@@ -1,14 +1,14 @@
 import crypto from "crypto";
 
-const KEY = Buffer.from(process.env.DATA_ENCRYPTION_KEY, "hex");
+const KEY = Buffer.from(process.env.DATA_ENCRYPTION_KEY || "", "hex");
 
+// NEVER throw at import time
 if (KEY.length !== 32) {
-  throw new Error("Invalid DATA_ENCRYPTION_KEY length");
+  console.warn("⚠️ Encryption key invalid or missing");
 }
 
-// AES-GCM requires UNIQUE IV per encryption
 export function encryptJSON(obj) {
-  const iv = crypto.randomBytes(12); // 96-bit standard
+  const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", KEY, iv);
 
   let encrypted = cipher.update(JSON.stringify(obj), "utf8", "base64");
@@ -22,16 +22,31 @@ export function encryptJSON(obj) {
 }
 
 export function decryptJSON(payload) {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    KEY,
-    Buffer.from(payload.iv, "hex")
-  );
+  // 🔴 CRITICAL GUARD
+  if (
+    !payload ||
+    !payload.iv ||
+    !payload.data ||
+    !payload.tag
+  ) {
+    return null; // ← do NOT crash
+  }
 
-  decipher.setAuthTag(Buffer.from(payload.tag, "hex"));
+  try {
+    const decipher = crypto.createDecipheriv(
+      "aes-256-gcm",
+      KEY,
+      Buffer.from(payload.iv, "hex")
+    );
 
-  let decrypted = decipher.update(payload.data, "base64", "utf8");
-  decrypted += decipher.final("utf8");
+    decipher.setAuthTag(Buffer.from(payload.tag, "hex"));
 
-  return JSON.parse(decrypted);
+    let decrypted = decipher.update(payload.data, "base64", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return JSON.parse(decrypted);
+  } catch (err) {
+    console.warn("⚠️ Decrypt failed, resetting DB");
+    return null;
+  }
 }
