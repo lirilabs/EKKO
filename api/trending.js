@@ -1,9 +1,12 @@
-export function getTrending(contents) {
+export function computeTrending(contents) {
+  const now = Date.now();
+
   return Object.values(contents)
-    .sort((a, b) => {
-      const scoreA = a.likes * 2 + (Date.now() - a.createdAt) / 1e6;
-      const scoreB = b.likes * 2 + (Date.now() - b.createdAt) / 1e6;
-      return scoreB - scoreA;
+    .map(c => {
+      const ageHours = (now - c.createdAt) / 3_600_000;
+      const score = c.likes * 3 + Math.max(0, 24 - ageHours);
+      return { ...c, score };
     })
+    .sort((a, b) => b.score - a.score)
     .slice(0, 20);
 }
