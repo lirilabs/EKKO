@@ -1,10 +1,10 @@
-// =====================================
-// SIMPLE EKKO API (NO ENCRYPTION)
-// =====================================
+// ===================================================
+// EKKO SIMPLE BACKEND (NO ENCRYPTION, ALLOW ALL ORIGINS)
+// ===================================================
 
 const GH_API = "https://api.github.com";
 
-// ---------- Helper: read request body ----------
+// ---------- Parse JSON body ----------
 async function parseBody(req) {
   return new Promise(resolve => {
     let data = "";
@@ -19,7 +19,7 @@ async function parseBody(req) {
   });
 }
 
-// ---------- Helper: GitHub request ----------
+// ---------- GitHub API helper ----------
 async function ghRequest(url, method = "GET", body) {
   const res = await fetch(url, {
     method,
@@ -34,14 +34,19 @@ async function ghRequest(url, method = "GET", body) {
   if (!res.ok) {
     throw new Error(await res.text());
   }
+
   return res.json();
 }
 
-// ---------- Load DB from GitHub ----------
+// ---------- Load DB ----------
 async function loadDB() {
-  const url = `${GH_API}/repos/${process.env.GITHUB_USERNAME}/${process.env.GITHUB_REPO}/contents/data/db.json?ref=${process.env.GITHUB_BRANCH || "main"}`;
+  const url =
+    `${GH_API}/repos/${process.env.GITHUB_USERNAME}` +
+    `/${process.env.GITHUB_REPO}` +
+    `/contents/data/db.json?ref=${process.env.GITHUB_BRANCH || "main"}`;
 
   const file = await ghRequest(url);
+
   const db = JSON.parse(
     Buffer.from(file.content, "base64").toString("utf8")
   );
@@ -49,9 +54,12 @@ async function loadDB() {
   return { db, sha: file.sha };
 }
 
-// ---------- Save DB to GitHub ----------
+// ---------- Save DB ----------
 async function saveDB(db, sha, message) {
-  const url = `${GH_API}/repos/${process.env.GITHUB_USERNAME}/${process.env.GITHUB_REPO}/contents/data/db.json`;
+  const url =
+    `${GH_API}/repos/${process.env.GITHUB_USERNAME}` +
+    `/${process.env.GITHUB_REPO}` +
+    `/contents/data/db.json`;
 
   await ghRequest(url, "PUT", {
     message,
@@ -61,20 +69,23 @@ async function saveDB(db, sha, message) {
   });
 }
 
-// =====================================
+// ===================================================
 // MAIN HANDLER
-// =====================================
+// ===================================================
 export default async function handler(req, res) {
   try {
-    // --------- CORS (ALLOW ALL) ----------
+    // ---------- CORS: ALLOW ALL ----------
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") return res.status(204).end();
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
 
     const { action } = req.query;
 
-    // --------- PING (ALWAYS WORKS) ----------
+    // ---------- PING (ALWAYS WORKS) ----------
     if (!action || action === "ping") {
       return res.json({
         ok: true,
@@ -83,7 +94,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // --------- ENV CHECK (ONLY NOW) ----------
+    // ---------- ENV CHECK ----------
     if (
       !process.env.GITHUB_USERNAME ||
       !process.env.GITHUB_REPO ||
@@ -98,7 +109,7 @@ export default async function handler(req, res) {
     const body = await parseBody(req);
     const { db, sha } = await loadDB();
 
-    // --------- CREATE USER ----------
+    // ---------- CREATE USER ----------
     if (action === "user:create" && req.method === "POST") {
       const id = "u_" + Date.now();
       db.users[id] = {
@@ -110,7 +121,7 @@ export default async function handler(req, res) {
       return res.json({ ok: true, id });
     }
 
-    // --------- CREATE CONTENT ----------
+    // ---------- CREATE CONTENT ----------
     if (action === "content:create" && req.method === "POST") {
       const id = "c_" + Date.now();
       db.contents[id] = {
@@ -128,7 +139,7 @@ export default async function handler(req, res) {
       return res.json({ ok: true, id });
     }
 
-    // --------- LIKE CONTENT ----------
+    // ---------- LIKE CONTENT ----------
     if (action === "content:like" && req.method === "POST") {
       const key = `${body.userId}_${body.contentId}`;
 
@@ -137,6 +148,7 @@ export default async function handler(req, res) {
       }
 
       db.likes[key] = true;
+
       if (db.contents[body.contentId]) {
         db.contents[body.contentId].likes++;
       }
@@ -145,10 +157,11 @@ export default async function handler(req, res) {
       return res.json({ ok: true });
     }
 
-    // --------- TRENDING ----------
+    // ---------- TRENDING ----------
     if (action === "content:trending") {
-      const list = Object.values(db.contents)
-        .sort((a, b) => b.likes - a.likes || b.createdAt - a.createdAt);
+      const list = Object.values(db.contents).sort(
+        (a, b) => b.likes - a.likes || b.createdAt - a.createdAt
+      );
 
       return res.json({ ok: true, data: list });
     }
@@ -156,7 +169,10 @@ export default async function handler(req, res) {
     return res.json({ ok: false, message: "Unknown action" });
 
   } catch (err) {
-    console.error("ERROR:", err.message);
-    return res.status(500).json({ ok: false });
+    // IMPORTANT: show error for debugging
+    return res.status(500).json({
+      ok: false,
+      error: err.message
+    });
   }
 }
