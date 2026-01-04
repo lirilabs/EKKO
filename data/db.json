@@ -15,9 +15,11 @@
       "title": "ddd",
       "start": null,
       "end": null,
-      "likes": 0,
+      "likes": 1,
       "createdAt": 1767508156475
     }
   },
-  "likes": {}
+  "likes": {
+    "u_1767508148833_c_1767508156475": true
+  }
 }
