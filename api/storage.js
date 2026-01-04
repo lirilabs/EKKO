@@ -1,26 +1,30 @@
-import { encryptJSON, decryptJSON } from "./crypto.js";
+import { ghRequest } from "./github.js";
 
-const EMPTY_DB = {
-  users: {},
-  contents: {},
-  likes: {}
-};
+const EMPTY_DB = { users: {}, contents: {}, likes: {} };
 
-export async function loadDB(force = false) {
-  const file = await fetchGitHubFile(); // your existing GH fetch
-  const raw = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
+export async function loadDB(gh, crypto) {
+  const url = `${gh.api}/repos/${gh.user}/${gh.repo}/contents/${gh.path}?ref=${gh.branch}`;
+  const file = await ghRequest(gh, url);
 
-  const decrypted = decryptJSON(raw);
+  const raw = JSON.parse(
+    Buffer.from(file.content, "base64").toString("utf8")
+  );
 
-  // 🔴 AUTO-HEAL IF INVALID
-  if (!decrypted) {
-    console.warn("⚠️ DB corrupted or empty, reinitializing");
-
-    const fresh = encryptJSON(EMPTY_DB);
-    await saveRawToGitHub(fresh, file.sha, "reset corrupted db");
-
-    return { db: EMPTY_DB, sha: file.sha };
+  const db = crypto.decrypt(raw);
+  if (!db) {
+    return { db: EMPTY_DB, sha: file.sha, fresh: true };
   }
 
-  return { db: decrypted, sha: file.sha };
+  return { db, sha: file.sha, fresh: false };
+}
+
+export async function saveDB(gh, crypto, db, sha, msg) {
+  const encrypted = crypto.encrypt(db);
+  const url = `${gh.api}/repos/${gh.user}/${gh.repo}/contents/${gh.path}`;
+  await ghRequest(gh, url, "PUT", {
+    message: msg,
+    content: Buffer.from(JSON.stringify(encrypted)).toString("base64"),
+    sha,
+    branch: gh.branch
+  });
 }
