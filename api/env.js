@@ -7,7 +7,6 @@ export function getEnv() {
       token: process.env.GITHUB_TOKEN || null
     },
     cryptoKey: process.env.DATA_ENCRYPTION_KEY || null,
-    appEnv: process.env.APP_ENV || "dev",
     rateLimit: Number(process.env.RATE_LIMIT || 100)
   };
 }
