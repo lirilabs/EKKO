@@ -11,15 +11,14 @@ export async function loadDB(gh, crypto) {
   );
 
   const db = crypto.decrypt(raw);
-  if (!db) {
-    return { db: EMPTY_DB, sha: file.sha, fresh: true };
-  }
+  if (!db) return { db: EMPTY_DB, sha: file.sha, fresh: true };
 
   return { db, sha: file.sha, fresh: false };
 }
 
 export async function saveDB(gh, crypto, db, sha, msg) {
   const encrypted = crypto.encrypt(db);
+
   const url = `${gh.api}/repos/${gh.user}/${gh.repo}/contents/${gh.path}`;
   await ghRequest(gh, url, "PUT", {
     message: msg,
